@@ -2,6 +2,7 @@ from bot_instance import bot
 from minigames.ppt import ppt
 from minigames import coinflip
 from utils import cotacoes
+from utils import welcome
 from token_bot import TOKEN_BOT
 
 @bot.event
