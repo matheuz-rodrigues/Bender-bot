@@ -1,10 +1,12 @@
 from bot_instance import bot
 from token_bot import TOKEN_BOT
 from discord.ext import commands
+from bot_instance import discord
 from imports import *
 
 @bot.event
 async def on_ready():
+    await bot.change_presence(activity=discord.Game(name=".ajuda"))
     print(f'Bot conectado como {bot.user}')
 
 @bot.check
@@ -27,7 +29,7 @@ async def ajuda(ctx):
     **MINIGAMES**
     .ppt [Pedra, Papel, Tesoura] -> Jogue Pedra ou Papel ou Tesoura
     .coinflip [Cara ou Coroa] -> Jogue Cara ou Coroa
-    .cotacoes [Dólar, Euro, Iene, Libra, Franco e Bitcoin] -> Veja a cotação das moedas ao redor do mundo""")
+    .cotacao [Dólar, Euro, Iene, Libra, Franco e Bitcoin] -> Veja a cotação das moedas ao redor do mundo""")
 
 bot.run(TOKEN_BOT)
 
