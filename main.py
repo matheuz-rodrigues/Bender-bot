@@ -1,11 +1,10 @@
 from bot_instance import bot
 from token_bot import TOKEN_BOT
-from discord.ext import commands
-from bot_instance import discord
 from imports import *
 
 @bot.event
 async def on_ready():
+    await bot.tree.sync()
     await bot.change_presence(activity=discord.Game(name=".ajuda"))
     print(f'Bot conectado como {bot.user}')
 
