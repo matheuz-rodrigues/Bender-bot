@@ -1,4 +1,4 @@
-from utils import cotacoes, welcome, embeds
+from utils import cotacoes, welcome, embeds, clear
 from minigames import coinflip, ppt
 from discord.ext import commands
 from bot_instance import discord

@@ -35,9 +35,9 @@ async def coinflip(interaction: discord.Interaction, escolha: str = None):
         moeda = choice(["cara", "coroa"])
 
         if moeda == escolha:
-            await interaction.followup.send(f"Resultado: **{moeda}**. Você venceu!")
+            await interaction.followup.send(f"Resultado: **{moeda.capitalize()}**. Você venceu!")
         else:
-            await interaction.followup.send(f"Resultado: **{moeda}**. Você perdeu!")
+            await interaction.followup.send(f"Resultado: **{moeda.capitalize()}**. Você perdeu!")
     else:
         await interaction.response.send_message("Opção inválida. Tente novamente com 'cara' ou 'coroa'.", ephemeral=True)
 
