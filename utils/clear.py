@@ -12,7 +12,6 @@ async def clear(ctx, amount: int= None):
         await ctx.send("Por favor, especifique um número válido de mensagens para apagar (mínimo 1).")
         return
     else:
-        await ctx.channel.purge(limit=amount+1
-
-                                          )
-
+        if (ctx.author.guild_permissions.administrator == True):
+           await ctx.channel.purge(limit=amount+1)
+        else: await ctx.send(f"{ctx.author.mention}, você não tem permissão para executar esse comando, trouxa.")
