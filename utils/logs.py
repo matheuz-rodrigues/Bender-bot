@@ -10,12 +10,11 @@ voice_log = {}  # Inicialização do dicionário
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    log_channel_id = 1310813222370148403  # Substitua pelo seu ID de canal
+    log_channel_id = 1310813222370148403
     log_channel = bot.get_channel(log_channel_id)
 
-    # Verifica se o membro entrou em um canal de voz
     if before.channel is None and after.channel is not None:
-        # Armazena o horário de entrada
+
         voice_log[member.id] = datetime.now()
 
         embed = discord.Embed(
@@ -25,9 +24,7 @@ async def on_voice_state_update(member, before, after):
         )
         await log_channel.send(embed=embed)
 
-    # Verifica se o membro saiu do canal de voz
     elif before.channel is not None and after.channel is None:
-        # Calcula o tempo de permanência
         entry_time = voice_log.pop(member.id, None)
         if entry_time:
             duration = datetime.now() - entry_time
