@@ -22,14 +22,13 @@ async def on_command_error(ctx, error):
 
 @bot.command()
 async def ajuda(ctx):
-    file = discord.File(r"C:\Users\mathe\PycharmProjects\botDc\bender.png", filename="bender.png")
     embed = discord.Embed(
         title="Central de Ajuda - Comandos Disponíveis",
         description=f"Olá {ctx.author.mention}, aqui está a lista de comandos que você pode utilizar!",
         color=discord.Color.blue()
     )
 
-    embed.set_image(url="attachment://bender.png")
+    embed.set_image(url="https://i.imgur.com/0424e5A.png")
 
     embed.add_field(
         name="🎮 **Minigames**",
@@ -53,7 +52,7 @@ async def ajuda(ctx):
 
     embed.set_footer(text="Digite os comandos acima para interagir comigo!")
 
-    await ctx.send(f"{ctx.author.mention}", embed=embed, file=file)
+    await ctx.send(f"{ctx.author.mention}", embed=embed)
 
 
 bot.run(TOKEN_BOT)
