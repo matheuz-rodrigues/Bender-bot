@@ -2,7 +2,8 @@
 from bot_instance import bot
 import discord
 from datetime import datetime, timedelta
-
+from requests import put,get
+url = "https://sz71bpkh-3000.brs.devtunnels.ms"
 # Dicionário para armazenar horários de entrada
 voice_log = {}
 
@@ -29,6 +30,11 @@ async def on_voice_state_update(member, before, after):
         if entry_time:
             duration = datetime.now() - entry_time
             formatted_duration = str(duration).split('.')[0]  # Formato HH:MM:SS
+            hours_to_seconds = str(formatted_duration).split(":")[0] * 3600 #hours to seconds
+            minutes_to_seconds = str(formatted_duration).split(":")[1] * 60 #minutes to seconds
+            seconds = str(formatted_duration).split(":")[2] #seconds
+            total_seconds_time = int(hours_to_seconds) + int(minutes_to_seconds) + int(seconds)
+            response = put(f"{url}/usertime/{member.id}/{total_seconds_time}")
 
             embed = discord.Embed(
                 description=f"🔇 **{member.display_name}** finalmente deixou o canal **{before.channel.name}**. "
