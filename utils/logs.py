@@ -3,6 +3,7 @@ from bot_instance import bot
 import discord
 from datetime import datetime, timedelta
 from requests import put,get
+
 url = "https://sz71bpkh-3000.brs.devtunnels.ms"
 # Dicionário para armazenar horários de entrada
 voice_log = {}
