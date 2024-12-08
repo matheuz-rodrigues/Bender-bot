@@ -58,6 +58,7 @@ async def ajuda(ctx):
 a=0
 @bot.command()
 async def api(ctx):
+
     global a
     if a == 0:
         await ctx.send("Ligando os motores...")
@@ -75,8 +76,6 @@ async def loop():
         a=0
     else:
         while a == 1:
-            await asyncio.sleep(600)
-
             try:
                 url = url_api+"ping"
                 response = requests.get(url, timeout=5)
@@ -88,5 +87,9 @@ async def loop():
 
             except requests.exceptions.RequestException as e:
                 print(f"Erro na requisição: {e}")
+
+            await asyncio.sleep(600)
+
+
 
 bot.run(TOKEN_BOT)
