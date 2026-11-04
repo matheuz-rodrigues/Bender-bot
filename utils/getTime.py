@@ -3,7 +3,7 @@ import requests
 from bot_instance import bot
 from requests import get
 import discord
-from token_bot import url_api
+from settings import url_api
 @bot.command()
 async def tempo(ctx):
     url = url_api + 'usertime'

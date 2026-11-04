@@ -5,7 +5,7 @@ import discord
 import requests
 
 from bot_instance import bot
-from token_bot import url_api
+from settings import url_api
 
 LOG_CHANNEL_ID = 1310813222370148403
 # Horário de entrada de cada membro na call

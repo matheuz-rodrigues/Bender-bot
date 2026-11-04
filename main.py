@@ -1,7 +1,7 @@
 import asyncio
 from discord.ext import tasks
 from bot_instance import bot
-from token_bot import TOKEN_BOT, url_api
+from settings import TOKEN_BOT, url_api
 from imports import *
 
 @bot.event
