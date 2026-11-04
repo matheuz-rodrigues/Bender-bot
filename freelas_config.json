@@ -60,17 +60,20 @@
       {
         "nome": "forhire",
         "modelo": "completo",
-        "titulo": "[For Hire] Full-Stack Developer | Node.js/NestJS, React/Next.js, C#/.NET, Python scraping & automation | {taxa}"
+        "titulo": "[For Hire] Full-Stack Developer | Node.js/NestJS, React/Next.js, C#/.NET, Python scraping & automation | {taxa}",
+        "flair": "For Hire"
       },
       {
         "nome": "B2BForHire",
         "modelo": "completo",
-        "titulo": "[For Hire] Full-Stack Developer – web apps, REST APIs, automation & AI integrations | {taxa}"
+        "titulo": "[For Hire] Full-Stack Developer – web apps, REST APIs, automation & AI integrations | {taxa}",
+        "flair": "For Hire"
       },
       {
         "nome": "slavelabour",
         "modelo": "tarefa",
-        "titulo": "[OFFER] Python scraping, automations, bots and small web apps/APIs | from {taxa_tarefa} per task"
+        "titulo": "[OFFER] Python scraping, automations, bots and small web apps/APIs | from {taxa_tarefa} per task",
+        "flair": "Offer"
       }
     ]
   }

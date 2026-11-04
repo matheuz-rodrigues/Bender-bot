@@ -27,11 +27,11 @@ PADRAO = {
     "taxa_tarefa": "$20",
     "taxa_br": "R$ 50/h",
     "subs": [
-        {"nome": "forhire", "modelo": "completo",
+        {"nome": "forhire", "modelo": "completo", "flair": "For Hire",
          "titulo": "[For Hire] Full-Stack Developer | Node.js/NestJS, React/Next.js, C#/.NET, Python scraping & automation | {taxa}"},
-        {"nome": "B2BForHire", "modelo": "completo",
+        {"nome": "B2BForHire", "modelo": "completo", "flair": "For Hire",
          "titulo": "[For Hire] Full-Stack Developer – web apps, REST APIs, automation & AI integrations | {taxa}"},
-        {"nome": "slavelabour", "modelo": "tarefa",
+        {"nome": "slavelabour", "modelo": "tarefa", "flair": "Offer",
          "titulo": "[OFFER] Python scraping, automations, bots and small web apps/APIs | from {taxa_tarefa} per task"},
     ],
 }
@@ -146,8 +146,9 @@ def montar_lembrete(sub_cfg):
         title=f"📣 Hora de divulgar no r/{sub_cfg['nome']}",
         description=(
             "1. Clique em **Abrir no Reddit** (o título já vai preenchido)\n"
-            "2. Copie o texto acima e cole no corpo do post\n"
-            "3. Revise e envie. Depois clique em **✅ Postei**\n\n"
+            "2. Copie o texto acima e cole no corpo do post (editor em modo Markdown)\n"
+            f"3. Em **Add flair**, escolha **{sub_cfg.get('flair', 'For Hire')}** (obrigatório)\n"
+            "4. Revise e envie. Depois clique em **✅ Postei**\n\n"
             f"**Título:**\n```\n{titulo}\n```"
             "Confira as regras do sub na barra lateral antes de postar."
         ),
