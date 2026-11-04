@@ -76,5 +76,62 @@
         "flair": "Offer"
       }
     ]
+  },
+  "vagas": {
+    "canal_id": 0,
+    "min_aderencia": 5,
+    "max_candidatos": 30,
+    "linkedin_horas": 2,
+    "gupy_horas": 1,
+    "idade_maxima_horas": 48,
+    "cidades": [
+      "Belém",
+      "Ananindeua"
+    ],
+    "estados": [
+      "PA",
+      "Pará"
+    ],
+    "linkedin": [
+      [
+        "desenvolvedor full stack junior",
+        "Brazil"
+      ],
+      [
+        "desenvolvedor full stack pleno",
+        "Brazil"
+      ],
+      [
+        "desenvolvedor backend node.js",
+        "Brazil"
+      ],
+      [
+        "desenvolvedor react next.js",
+        "Brazil"
+      ],
+      [
+        "desenvolvedor .net c#",
+        "Brazil"
+      ],
+      [
+        "desenvolvedor python",
+        "Brazil"
+      ],
+      [
+        "desenvolvedor full stack",
+        "Belém, Pará, Brazil"
+      ]
+    ],
+    "gupy": [
+      "desenvolvedor full stack",
+      "desenvolvedor backend",
+      "desenvolvedor node",
+      "desenvolvedor react",
+      "desenvolvedor .net",
+      "desenvolvedor c#",
+      "desenvolvedor python",
+      "desenvolvedor junior",
+      "desenvolvedor pleno"
+    ]
   }
 }
