@@ -1,9 +1,10 @@
 """Radar de freelas: monitora o Reddit e posta no Discord as vagas que batem com o currículo.
 
-- Lê o RSS público dos subreddits (uma requisição para todos, sem API key).
-- Dá uma nota para cada post com base nas habilidades do currículo (pesos abaixo).
-- Posta um card com nota, skills que bateram, orçamento detectado e idioma.
-- Botões: ⭐ Interessa / 🗑️ Ignorar / ✍️ Rascunho (gera uma proposta em PT ou EN).
+- Lê o RSS público do Reddit (sem API key) em GRUPOS de subreddits (multireddit r/a+b+c).
+- O RSS sem login aceita ~1 requisição por minuto, então os grupos são lidos em rodízio.
+- Filtra por intenção de contratar (EN/PT/ES/DE/FR) e dá nota pelas habilidades do currículo.
+- Posta um card com nota, skills, orçamento e idioma, com botões:
+  ⭐ Interessa / 🗑️ Ignorar / ✍️ Rascunho (proposta em PT, EN ou ES).
 - Slash commands: /freelas aqui | status | agora | pausar | retomar | nota_minima
 """
 
@@ -14,7 +15,7 @@ import os
 import re
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import discord
 import requests
@@ -28,8 +29,9 @@ CONFIG_PATH = os.path.join(BASE_DIR, "freelas_config.json")
 STATE_PATH = os.path.join(BASE_DIR, "freelas_vistos.json")
 DONOS = {796471574827237436, 534878109611065354}
 ATOM = "{http://www.w3.org/2005/Atom}"
-USER_AGENT = "python:bender-freela-radar:1.0 (personal RSS reader)"
-MAX_VISTOS = 3000
+USER_AGENT = "python:bender-freela-radar:1.1 (personal RSS reader)"
+MAX_VISTOS = 5000
+INTERVALO_MINIMO_REDDIT = 65  # segundos entre requisições (limite do RSS sem login)
 
 # ---------------------------------------------------------------------------
 # Perfil (tirado dos currículos em Desktop/curriculos)
@@ -40,70 +42,122 @@ HABILIDADES = [
     ("Node.js", 3, [r"node(\.?js)?"]),
     ("NestJS", 3, [r"nest(\.?js)?"]),
     ("Express", 2, [r"express(\.?js)?"]),
-    ("TypeScript", 3, [r"typescript", r"\bts\b"]),
+    ("TypeScript", 3, [r"typescript"]),
     ("JavaScript", 2, [r"javascript", r"vanilla js"]),
-    ("React", 3, [r"react(\.?js)?"]),
+    ("React", 3, [r"react(\.?js)?", r"react native"]),
     ("Next.js", 3, [r"next\.?js"]),
     ("C#", 3, [r"c#", r"csharp"]),
     (".NET", 3, [r"\.net\b", r"dotnet", r"asp\.net"]),
-    ("Python", 3, [r"python"]),
-    ("API REST", 3, [r"\bapis?\b", r"rest(ful)?\s*api", r"backend", r"back-end"]),
+    ("Python", 3, [r"python", r"django", r"flask", r"fastapi"]),
+    ("API REST", 3, [r"apis?", r"rest(ful)?\s*api", r"backend", r"back-end"]),
     ("Full Stack", 2, [r"full[\s-]?stack"]),
-    ("Web scraping", 3, [r"scrap(er|ing|e)", r"crawler", r"selenium", r"beautiful\s?soup", r"playwright", r"puppeteer"]),
-    ("Automação", 3, [r"automa(tion|te|ção|cao|tizar)", r"\bbot\b", r"\bbots\b", r"zapier", r"n8n"]),
-    ("ETL / Dados", 2, [r"\betl\b", r"data pipeline", r"pipeline de dados", r"data entry", r"planilha", r"spreadsheet"]),
-    ("IA / LLM", 3, [r"\bllms?\b", r"openai", r"chatgpt", r"\bgpt\b", r"gemini", r"claude", r"chatbot", r"\bai agent", r"agente de ia", r"\brag\b"]),
-    ("SaaS", 2, [r"\bsaas\b", r"mvp", r"web app", r"web application", r"aplica(ção|cao) web", r"sistema web"]),
-    ("Integrações", 2, [r"integra(tion|te|ção|cao)", r"webhooks?", r"stripe", r"asaas", r"\bpix\b", r"google calendar", r"google sheets"]),
-    ("PostgreSQL", 2, [r"postgres(ql)?"]),
+    ("Web scraping", 3, [r"scrap(er|ers|ing|e)", r"crawler", r"selenium", r"beautiful\s?soup", r"playwright", r"puppeteer"]),
+    ("Automação", 3, [r"automa(tion|tions|te|ted|ção|cao|ções|tizar|tización|tisierung)", r"bot", r"bots", r"zapier", r"n8n", r"make\.com", r"rpa"]),
+    ("ETL / Dados", 2, [r"etl", r"data pipeline", r"pipeline de dados", r"planilhas?", r"spreadsheets?", r"excel"]),
+    ("IA / LLM", 3, [r"llms?", r"openai", r"chatgpt", r"gpt", r"gemini", r"claude", r"chatbots?", r"ai agents?", r"agentes? de ia", r"rag", r"\bia\b", r"\bai\b"]),
+    ("SaaS / Web app", 2, [r"saas", r"mvp", r"web ?app", r"web application", r"aplica(ção|cao) web", r"sistema web", r"aplicación web", r"plataforma"]),
+    ("Integrações", 2, [r"integra(tion|tions|te|ção|cao|ções|ción)", r"webhooks?", r"stripe", r"asaas", r"pix", r"google calendar", r"google sheets", r"whatsapp"]),
+    ("PostgreSQL", 2, [r"postgres(ql)?", r"supabase"]),
     ("MySQL", 2, [r"mysql"]),
-    ("SQL Server", 2, [r"sql server", r"mssql", r"\bsql\b"]),
+    ("SQL Server", 2, [r"sql server", r"mssql", r"sql"]),
     ("MongoDB", 2, [r"mongo(db)?"]),
     ("Prisma", 1, [r"prisma"]),
-    ("Docker", 2, [r"docker", r"container"]),
-    ("AWS", 2, [r"\baws\b", r"lambda", r"\bs3\b", r"\bec2\b"]),
+    ("Docker", 2, [r"docker", r"containers?"]),
+    ("AWS", 2, [r"aws", r"lambda", r"s3", r"ec2"]),
     ("Azure", 2, [r"azure"]),
     ("RabbitMQ", 2, [r"rabbitmq", r"message queue", r"mensageria"]),
     ("Tailwind", 1, [r"tailwind"]),
     ("Angular", 1, [r"angular"]),
-    ("Java / Spring", 1, [r"\bjava\b", r"spring\s?boot"]),
-    ("Testes / QA", 1, [r"\bqa\b", r"jest", r"unit tests?", r"testes?", r"cypress"]),
-    ("Linux / DevOps", 1, [r"linux", r"ci/cd", r"devops", r"\bvps\b", r"deploy"]),
-    ("Dashboard", 1, [r"dashboard", r"painel", r"admin panel"]),
-    ("Landing page / site", 1, [r"landing page", r"website", r"\bsite\b"]),
+    ("Java / Spring", 1, [r"java", r"spring\s?boot"]),
+    ("Testes / QA", 1, [r"qa", r"jest", r"unit tests?", r"testes?", r"cypress"]),
+    ("Linux / DevOps", 1, [r"linux", r"ci/cd", r"devops", r"vps", r"deploy"]),
+    ("Dashboard", 1, [r"dashboards?", r"painel", r"admin panel"]),
+    ("Site / Landing page", 1, [r"landing pages?", r"websites?", r"site", r"sitio web", r"página web"]),
+    ("Discord / Telegram", 2, [r"discord", r"telegram"]),
 ]
-_HAB_RX = [(r, p, re.compile("|".join(f"(?<![\\w]){x}(?![\\w])" for x in pats), re.I))
-           for r, p, pats in HABILIDADES]
 
-# Sinais de que NÃO é pra você (fora da stack ou sem pagamento)
-EXCLUIR = re.compile(
-    r"\[\s*for\s*hire\s*\]|\bunpaid\b|equity only|rev(enue)?\s*share|\bfor exposure\b|"
-    r"\bvoluntário\b|sem remunera|\bwordpress\b|\bshopify\b|\bwix\b|\bunity\b|\bunreal\b|"
-    r"\bvideo edit|\bthumbnail|\bvoice ?over|\bugc\b|\bcontent creator|\bcopywrit|"
-    r"\bseo\b|\bsocial media manager|\bgraphic design|\blogo design|\billustrat",
+
+def _rx(padroes):
+    # remove \b explícitos e aplica bordas que funcionam com c#, .net, etc.
+    limpos = [p.replace(r"\b", "") for p in padroes]
+    return re.compile("|".join(f"(?<![\\w]){p}(?![\\w])" for p in limpos), re.I)
+
+
+_HAB_RX = [(r, p, _rx(pats)) for r, p, pats in HABILIDADES]
+
+# Título precisa indicar que ALGUÉM QUER CONTRATAR (EN / PT / ES / DE / FR)
+INTENCAO = re.compile(
+    r"\[\s*(hiring|task|paid|job|gig|vaga|freela|oferta|empleo|trabajo)\s*\]|"
+    r"\bhiring\b|\bwe'?re hiring\b|"
+    r"\b(looking for|need|needed|seeking|searching for|want to hire|hire)\s+(an?\s+|some\s+)?"
+    r"(experienced\s+|senior\s+|skilled\s+|freelance\s+)?"
+    r"(dev|devs|developer|developers|programmer|coder|engineer|freelancer|someone to (build|create|make|develop|fix|automate|scrape))\b|"
+    r"\b(developer|programmer|freelancer|dev)\s+(needed|wanted|required)\b|"
+    r"\bpaid\s+(gig|project|task|work)\b|\bwill pay\b|\bbudget\b|"
+    # PT
+    r"\bfreela\b|\bcontrat(o|a|ando|ar|amos|a-se)\b|"
+    r"\b(procuro|procura-se|preciso de|precisamos de|buscando|procurando)\s+(um\s+|uma\s+|alguém\s+)?"
+    r"(dev|desenvolvedor|desenvolvedora|programador|programadora|freelancer|freela|pessoa)\b|"
+    r"\bor[cç]amento\b|\bprojeto pago\b|\bvaga\s+(remota|freela|pj|de dev|para dev)\b|"
+    # ES
+    r"\b(busco|buscamos|necesito|necesitamos|se busca|buscando)\s+(un\s+|una\s+|a\s+)?"
+    r"(dev|desarrollador|desarrolladora|programador|programadora|freelancer|freelance)\b|"
+    r"\bproyecto (pago|remunerado)\b|\bcontratar\b|"
+    # DE / FR
+    r"\b(suche|suchen)\s+(einen\s+|eine\s+)?(entwickler|programmierer|freelancer)\b|\bfreelancer gesucht\b|"
+    r"\b(cherche|recherche|cherchons)\s+(un\s+|une\s+)?(développeur|développeuse|dev|freelance)\b|\bmission freelance\b",
     re.I,
+)
+
+# Sinais de que NÃO é pra você: quem está procurando trabalho, sem pagamento ou fora da área
+EXCLUIR = re.compile(
+    r"\[\s*(for\s*hire|offer|forhire)\s*\]|\bfor hire\b|\bhire me\b|\bavailable for (work|hire|freelance)\b|"
+    r"\blooking for (a |an )?(new |remote |part[- ]time |full[- ]time )?(job|work|gig|opportunit|internship|role)|"
+    r"\b(procuro|buscando|procurando) (emprego|trabalho|est[aá]gio|oportunidade|vaga)\b|"
+    r"\b(busco|buscando) (trabajo|empleo|pr[aá]cticas)\b|\bsuche (job|arbeit|stelle)\b|"
+    r"\bunpaid\b|equity only|rev(enue)?\s*share|\bfor exposure\b|\bvolunt[aá]rio\b|sem remunera|sin pago|"
+    r"\bwordpress\b|\bshopify\b|\bwix\b|\bunity\b|\bunreal\b|\broblox\b|"
+    r"\bvideo edit|\bthumbnail|\bvoice ?over|\bugc\b|\bcontent creator|\bcopywrit|\bappointment setter|"
+    r"\bseo\b|\bsocial media manager|\bgraphic design|\blogo design|\billustrat|\bcold call|\bsales rep|\bsetters?\b|"
+    r"\bclosers?\b|\bvoice\b|\brecruit|\bvirtual assistant|\bcustomer (support|service)|\bdata entry|"
+    r"\btutor|\btranslat|\binterpret|\bproject manager\b",
+    re.I,
+)
+# No corpo do post só derruba por falta de pagamento (citar "WordPress" no texto não deve excluir)
+SEM_PAGAMENTO = re.compile(
+    r"\bunpaid\b|equity only|rev(enue)?\s*share|\bfor exposure\b|\bvolunt[aá]rio\b|sem remunera|sin pago", re.I
 )
 
 ORCAMENTO = re.compile(
-    r"(?:US\$|R\$|\$|€|£|USD\s?)\s?\d[\d.,]*\s?k?"
-    r"(?:\s?(?:-|–|to|a|até)\s?(?:US\$|R\$|\$|€|£)?\s?\d[\d.,]*\s?k?)?"
-    r"(?:\s?(?:/|per\s|por\s)\s?(?:h|hr|hour|hora|mo|month|mês|week|semana|project|projeto))?",
+    r"(?:US\$|R\$|\$|€|£|USD\s?|EUR\s?)\s?\d[\d.,]*\s?k?"
+    r"(?:\s?(?:-|–|to|a|até|hasta)\s?(?:US\$|R\$|\$|€|£)?\s?\d[\d.,]*\s?k?)?"
+    r"(?:\s?(?:/|per\s|por\s)\s?(?:h|hr|hour|hora|mo|month|mês|mes|week|semana|project|projeto|proyecto))?",
     re.I,
 )
+
+# Idioma "padrão" de cada sub (o resto é detectado pelo texto)
+IDIOMA_SUB = {
+    "brdev": "PT", "programacao": "PT", "devpt": "PT",
+    "devsarg": "ES", "chileit": "ES", "programacion": "ES",
+    "de_edv": "DE", "informatik": "DE", "developpeurs": "FR",
+}
+BANDEIRAS = {"PT": "🇧🇷 PT", "EN": "🇺🇸 EN", "ES": "🇪🇸 ES", "DE": "🇩🇪 DE", "FR": "🇫🇷 FR"}
 
 PADRAO_CONFIG = {
     "canal_id": 0,
     "mencao": "",
-    "intervalo_segundos": 300,
-    "nota_minima": 3,
-    "subreddits": [
-        {"nome": "forhire", "titulo": r"\[\s*hiring\s*\]"},
-        {"nome": "freelance_forhire", "titulo": r"\[\s*hiring\s*\]"},
-        {"nome": "hiring", "titulo": r"\[\s*hiring\s*\]"},
-        {"nome": "jobbit", "titulo": r"\[\s*hiring\s*\]"},
-        {"nome": "slavelabour", "titulo": r"\[\s*task\s*\]"},
-        {"nome": "RemoteJobs", "titulo": r"\[\s*hiring\s*\]|\bfreelance\b|\bcontract(or)?\b|\bpart[- ]time\b"},
-        {"nome": "brdev", "titulo": r"\bfreela\b|\bcontrat(o|a|ando|ar)\b|\b(procuro|procura-se|preciso de|buscando)\s+(um\s+|uma\s+)?(dev|desenvolvedor|desenvolvedora|programador|programadora)\b|\bor[cç]amento\b|\bprojeto pago\b|\[\s*(vaga|freela)\s*\]"},
+    "nota_minima": 5,
+    "idade_maxima_horas": 24,
+    "grupos": [
+        {"nome": "Vagas e freelas (EN)", "subs": [
+            "forhire", "freelance_forhire", "hiring", "jobbit", "slavelabour", "RemoteJobs",
+            "remotepython", "PythonJobs", "DoneDirtCheap", "B2BForHire", "techjobs", "devopsjobs", "WorkOnline"]},
+        {"nome": "Brasil, Portugal, LatAm e Europa", "subs": [
+            "brdev", "programacao", "devpt", "devsarg", "chileIT", "programacion",
+            "de_EDV", "informatik", "developpeurs"]},
+        {"nome": "Negócios pedindo dev", "subs": [
+            "SaaS", "smallbusiness", "sideprojects", "startups", "Entrepreneur",
+            "n8n", "webscraping", "automation", "Discord_Bots"]},
     ],
 }
 
@@ -115,7 +169,12 @@ PERFIL = {
 # ---------------------------------------------------------------------------
 # Estado
 # ---------------------------------------------------------------------------
-estado = {"ultima": None, "erro": None, "enviados": 0, "pausado": False, "analisados": 0}
+estado = {
+    "ultima": None, "erro": None, "enviados": 0, "pausado": False, "analisados": 0,
+    "proximo_grupo": 0, "por_grupo": {},
+}
+_trava_reddit = asyncio.Lock()
+_ultima_requisicao = 0.0
 
 
 def _ler_json(caminho, padrao):
@@ -138,11 +197,13 @@ def carregar_config():
     if cfg is None:
         cfg = json.loads(json.dumps(PADRAO_CONFIG))
         _salvar_json(CONFIG_PATH, cfg)
+    for chave, valor in PADRAO_CONFIG.items():
+        cfg.setdefault(chave, json.loads(json.dumps(valor)))
     return cfg
 
 
 config = carregar_config()
-vistos = _ler_json(STATE_PATH, {})
+vistos = _ler_json(STATE_PATH, {})  # url do post -> timestamp
 
 # ---------------------------------------------------------------------------
 # Reddit
@@ -155,13 +216,8 @@ def _limpar_html(texto):
 
 def _baixar_feed(subs):
     url = f"https://www.reddit.com/r/{'+'.join(subs)}/new/.rss?limit=100"
-    for tentativa in range(4):
-        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
-        if r.status_code == 429 and tentativa < 3:
-            time.sleep(15 * (tentativa + 1))
-            continue
-        r.raise_for_status()
-        break
+    r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
+    r.raise_for_status()
     raiz = ET.fromstring(r.content)
     posts = []
     for e in raiz.findall(f"{ATOM}entry"):
@@ -179,16 +235,35 @@ def _baixar_feed(subs):
         })
     return posts
 
+
+async def _baixar_com_limite(subs):
+    """Respeita ~1 requisição/minuto ao Reddit, mesmo com o loop e o /freelas agora juntos."""
+    global _ultima_requisicao
+    async with _trava_reddit:
+        espera = INTERVALO_MINIMO_REDDIT - (time.monotonic() - _ultima_requisicao)
+        if espera > 0:
+            await asyncio.sleep(espera)
+        try:
+            return await asyncio.to_thread(_baixar_feed, subs)
+        finally:
+            _ultima_requisicao = time.monotonic()
+
 # ---------------------------------------------------------------------------
 # Análise
 # ---------------------------------------------------------------------------
+def _data(post):
+    try:
+        return datetime.fromisoformat(post["data"].replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
 def analisar(post):
     """Retorna dict com nota/skills, ou None se o post não serve."""
-    subcfg = next((s for s in config["subreddits"] if s["nome"].lower() == post["sub"].lower()), None)
-    if subcfg and subcfg.get("titulo") and not re.search(subcfg["titulo"], post["titulo"], re.I):
+    if not INTENCAO.search(post["titulo"]):
         return None
     texto = f"{post['titulo']} {post['texto']}"
-    if EXCLUIR.search(texto):
+    if EXCLUIR.search(post["titulo"]) or SEM_PAGAMENTO.search(post["texto"]):
         return None
 
     skills = [(rotulo, peso) for rotulo, peso, rx in _HAB_RX if rx.search(texto)]
@@ -209,12 +284,19 @@ def analisar(post):
 
 
 def detectar_idioma(post):
-    if post["sub"].lower() == "brdev":
-        return "PT"
     t = f" {post['titulo']} {post['texto']} ".lower()
-    pt = sum(t.count(w) for w in (" de ", " para ", " que ", " com ", "ção", " você", " preciso", " um ", " uma "))
-    en = sum(t.count(w) for w in (" the ", " and ", " for ", " with ", " you ", " need ", " looking ", " we "))
-    return "PT" if pt > en else "EN"
+    marcas = {
+        "PT": (" de ", " para ", " que ", " com ", "ção", " você", " preciso", " uma ", " não "),
+        "ES": (" de ", " para ", " que ", " con ", "ción", " necesito", " una ", " busco", " el ", " los "),
+        "EN": (" the ", " and ", " for ", " with ", " you ", " need ", " looking ", " we "),
+        "DE": (" der ", " die ", " und ", " mit ", " ich ", " wir ", " suche "),
+        "FR": (" le ", " la ", " et ", " avec ", " pour ", " nous ", " cherche "),
+    }
+    contagem = {lang: sum(t.count(w) for w in ws) for lang, ws in marcas.items()}
+    padrao = IDIOMA_SUB.get(post["sub"].lower())
+    if padrao:
+        contagem[padrao] += 3  # o idioma do sub desempata
+    return max(contagem, key=contagem.get)
 
 
 def montar_embed(post, a):
@@ -231,14 +313,12 @@ def montar_embed(post, a):
     e.set_author(name=f"r/{post['sub']} • u/{post['autor']}")
     e.add_field(name="Match", value=f"{'★' * a['estrelas']}{'☆' * (5 - a['estrelas'])}  ({a['pontos']} pts)", inline=True)
     e.add_field(name="Orçamento", value=a["orcamento"] or "não informado", inline=True)
-    e.add_field(name="Idioma", value="🇧🇷 PT" if a["idioma"] == "PT" else "🇺🇸 EN", inline=True)
+    e.add_field(name="Idioma", value=BANDEIRAS.get(a["idioma"], a["idioma"]), inline=True)
     e.add_field(name="Suas skills que batem", value=", ".join(a["skills"][:12])[:1024], inline=False)
     e.set_footer(text="Radar de freelas • responda rápido, quem chega primeiro leva")
-    if post["data"]:
-        try:
-            e.timestamp = datetime.fromisoformat(post["data"].replace("Z", "+00:00"))
-        except ValueError:
-            pass
+    d = _data(post)
+    if d:
+        e.timestamp = d
     return e
 
 
@@ -253,6 +333,17 @@ def gerar_rascunho(titulo, skills, idioma):
             "Também atendo sistemas corporativos em C#/.NET com mais de 500 usuários ativos.\n\n"
             "Para o seu caso, eu começaria por [ESCREVA AQUI 1 FRASE SOBRE O PROBLEMA DELE].\n\n"
             "Posso te mandar uma estimativa de prazo e valor ainda hoje. Podemos conversar por DM?\n\n"
+            f"GitHub: {PERFIL['github']}\nLinkedIn: {PERFIL['linkedin']}"
+        )
+    if idioma == "ES":
+        return (
+            f"¡Hola! Vi tu publicación \"{titulo[:80]}\" y creo que puedo ayudarte.\n\n"
+            f"Soy desarrollador Full Stack y trabajo a diario con {principais}. "
+            "Tengo sistemas en producción: un SaaS de gestión de gimnasios que llevé de cero a producción en 3 meses "
+            "(Next.js + NestJS) y ArenaHub, una plataforma con integración de IA (Gemini) y pagos automáticos vía webhooks. "
+            "También mantengo un sistema corporativo en C#/.NET con más de 500 usuarios activos.\n\n"
+            "Para tu proyecto, empezaría por [ESCRIBE 1 FRASE SOBRE SU PROBLEMA].\n\n"
+            "Puedo enviarte una estimación de plazo y costo hoy mismo. ¿Hablamos por DM?\n\n"
             f"GitHub: {PERFIL['github']}\nLinkedIn: {PERFIL['linkedin']}"
         )
     return (
@@ -301,7 +392,8 @@ class FreelaView(discord.ui.View):
     @discord.ui.button(label="Rascunho", emoji="✍️", style=discord.ButtonStyle.primary, custom_id="freela:rascunho")
     async def rascunho(self, interaction, button):
         embed = interaction.message.embeds[0]
-        idioma = "PT" if "PT" in _campo(embed, "Idioma") else "EN"
+        campo = _campo(embed, "Idioma")
+        idioma = "PT" if "PT" in campo else "ES" if "ES" in campo else "EN"
         skills = [s.strip() for s in _campo(embed, "Suas skills que batem").split(",") if s.strip()]
         texto = gerar_rascunho(embed.title or "", skills, idioma)
         await interaction.response.send_message(
@@ -310,32 +402,38 @@ class FreelaView(discord.ui.View):
         )
 
 # ---------------------------------------------------------------------------
-# Loop
+# Busca
 # ---------------------------------------------------------------------------
-async def checar(forcar_envio=False):
+async def checar_grupo(indice):
+    """Lê um grupo de subs e envia os posts relevantes. Retorna quantos enviou."""
     canal = bot.get_channel(config.get("canal_id", 0))
     if canal is None:
         estado["erro"] = "Canal não configurado. Use /freelas aqui no canal desejado."
         return 0
 
-    primeira_vez = not vistos and not forcar_envio
+    grupo = config["grupos"][indice]
     try:
-        posts = await asyncio.to_thread(_baixar_feed, [s["nome"] for s in config["subreddits"]])
-    except Exception as e:
-        estado["erro"] = f"{type(e).__name__}: {e}"[:300]
-        print(f"[freelas] erro ao ler Reddit: {estado['erro']}")
+        posts = await _baixar_com_limite(grupo["subs"])
+    except Exception as e:  # 429/403 do Reddit, rede, XML inválido
+        estado["erro"] = f"[{grupo['nome']}] {type(e).__name__}: {e}"[:300]
+        print(f"[freelas] {estado['erro']}")
         return 0
 
     estado["erro"] = None
     estado["ultima"] = datetime.now(timezone.utc)
+    limite = datetime.now(timezone.utc) - timedelta(hours=config.get("idade_maxima_horas", 24))
     enviados = 0
     for post in sorted(posts, key=lambda p: p["data"]):
-        if post["id"] in vistos:
+        chave = post["url"]
+        if not chave or chave in vistos:
             continue
-        vistos[post["id"]] = int(time.time())
+        vistos[chave] = int(time.time())
         estado["analisados"] += 1
+        d = _data(post)
+        if d and d < limite:
+            continue
         a = analisar(post)
-        if a is None or primeira_vez:
+        if a is None:
             continue
         await canal.send(content=config.get("mencao") or None, embed=montar_embed(post, a), view=FreelaView())
         enviados += 1
@@ -346,33 +444,50 @@ async def checar(forcar_envio=False):
             del vistos[k]
     _salvar_json(STATE_PATH, vistos)
     estado["enviados"] += enviados
-    if primeira_vez:
-        print(f"[freelas] primeira execução: {len(vistos)} posts marcados como vistos.")
+    estado["por_grupo"][grupo["nome"]] = {"posts": len(posts), "enviados": enviados, "quando": estado["ultima"]}
     return enviados
 
 
-@tasks.loop(seconds=300)
+async def _recuperar_vistos_do_canal():
+    """Depois de um deploy o arquivo de vistos some; reconstrói a partir dos cards já enviados."""
+    canal = bot.get_channel(config.get("canal_id", 0))
+    if canal is None:
+        return
+    try:
+        async for msg in canal.history(limit=500):
+            if msg.author.id == bot.user.id:
+                for emb in msg.embeds:
+                    if emb.url:
+                        vistos.setdefault(emb.url, int(time.time()))
+    except discord.HTTPException as e:
+        print(f"[freelas] não consegui ler o histórico do canal: {e}")
+
+
+@tasks.loop(seconds=INTERVALO_MINIMO_REDDIT + 10)
 async def radar():
-    if not estado["pausado"]:
-        await checar()
+    if estado["pausado"] or not config["grupos"]:
+        return
+    indice = estado["proximo_grupo"] % len(config["grupos"])
+    estado["proximo_grupo"] = indice + 1
+    await checar_grupo(indice)
 
 
 @radar.before_loop
 async def _antes():
     await bot.wait_until_ready()
+    await _recuperar_vistos_do_canal()
 
 
 @bot.listen("on_ready")
 async def _iniciar_radar():
     bot.add_view(FreelaView())
     if not radar.is_running():
-        radar.change_interval(seconds=max(60, int(config.get("intervalo_segundos", 300))))
         radar.start()
 
 # ---------------------------------------------------------------------------
 # Slash commands
 # ---------------------------------------------------------------------------
-grupo = app_commands.Group(name="freelas", description="Radar de freelas do Reddit")
+grupo_cmd = app_commands.Group(name="freelas", description="Radar de freelas do Reddit")
 
 
 async def _so_dono(interaction):
@@ -382,25 +497,30 @@ async def _so_dono(interaction):
     return True
 
 
-@grupo.command(name="aqui", description="Define este canal como destino dos freelas")
+async def _checar_todos():
+    total = 0
+    for i in range(len(config["grupos"])):
+        total += await checar_grupo(i)
+    return total
+
+
+@grupo_cmd.command(name="aqui", description="Define este canal como destino dos freelas")
 async def cmd_aqui(interaction: discord.Interaction):
     if not await _so_dono(interaction):
         return
     config["canal_id"] = interaction.channel_id
     _salvar_json(CONFIG_PATH, config)
     estado["erro"] = None
-    await interaction.response.defer(ephemeral=True, thinking=True)
-    n = await checar(forcar_envio=True)
-    resultado = f"⚠️ {estado['erro']}" if estado["erro"] else f"Primeira busca feita: {n} freela(s) enviado(s)."
-    await interaction.followup.send(
-        f"📡 Beleza! Os freelas vão chegar neste canal.\n{resultado}\n\n"
-        f"Para não perder essa configuração a cada deploy, coloque no `freelas_config.json`:\n"
+    await interaction.response.send_message(
+        "📡 Beleza! Os freelas vão chegar neste canal (busca completa leva ~3 min).\n\n"
+        "Para não perder essa configuração a cada deploy, coloque no `freelas_config.json`:\n"
         f"`\"canal_id\": {interaction.channel_id}`",
         ephemeral=True,
     )
+    await _checar_todos()
 
 
-@grupo.command(name="status", description="Mostra como está o radar")
+@grupo_cmd.command(name="status", description="Mostra como está o radar")
 async def cmd_status(interaction: discord.Interaction):
     canal = bot.get_channel(config.get("canal_id", 0))
     ultima = f"<t:{int(estado['ultima'].timestamp())}:R>" if estado["ultima"] else "ainda não checou"
@@ -411,23 +531,27 @@ async def cmd_status(interaction: discord.Interaction):
     e.add_field(name="Posts analisados", value=str(estado["analisados"]), inline=True)
     e.add_field(name="Enviados", value=str(estado["enviados"]), inline=True)
     e.add_field(name="Nota mínima", value=f"{config.get('nota_minima', 3)} pts", inline=True)
-    e.add_field(name="Subreddits", value=", ".join(f"r/{s['nome']}" for s in config["subreddits"]), inline=False)
+    for g in config["grupos"]:
+        info = estado["por_grupo"].get(g["nome"])
+        resumo = (f"{info['posts']} posts lidos, {info['enviados']} enviados • <t:{int(info['quando'].timestamp())}:R>"
+                  if info else "aguardando a vez no rodízio")
+        e.add_field(name=g["nome"], value=f"{resumo}\n{', '.join('r/' + s for s in g['subs'])}"[:1024], inline=False)
     if estado["erro"]:
         e.add_field(name="⚠️ Último erro", value=estado["erro"], inline=False)
     await interaction.response.send_message(embed=e, ephemeral=True)
 
 
-@grupo.command(name="agora", description="Checa o Reddit agora")
+@grupo_cmd.command(name="agora", description="Busca em todos os grupos agora (leva ~3 min por causa do limite do Reddit)")
 async def cmd_agora(interaction: discord.Interaction):
     if not await _so_dono(interaction):
         return
     await interaction.response.defer(ephemeral=True, thinking=True)
-    n = await checar(forcar_envio=True)
-    msg = f"✅ Checagem feita: {n} freela(s) novo(s)." if not estado["erro"] else f"⚠️ {estado['erro']}"
+    n = await _checar_todos()
+    msg = f"✅ Busca completa: {n} freela(s) novo(s)." if not estado["erro"] else f"⚠️ {estado['erro']}"
     await interaction.followup.send(msg, ephemeral=True)
 
 
-@grupo.command(name="pausar", description="Pausa o radar")
+@grupo_cmd.command(name="pausar", description="Pausa o radar")
 async def cmd_pausar(interaction: discord.Interaction):
     if not await _so_dono(interaction):
         return
@@ -435,7 +559,7 @@ async def cmd_pausar(interaction: discord.Interaction):
     await interaction.response.send_message("⏸️ Radar pausado.", ephemeral=True)
 
 
-@grupo.command(name="retomar", description="Retoma o radar")
+@grupo_cmd.command(name="retomar", description="Retoma o radar")
 async def cmd_retomar(interaction: discord.Interaction):
     if not await _so_dono(interaction):
         return
@@ -443,7 +567,7 @@ async def cmd_retomar(interaction: discord.Interaction):
     await interaction.response.send_message("▶️ Radar rodando de novo.", ephemeral=True)
 
 
-@grupo.command(name="nota_minima", description="Quantos pontos um post precisa para ser enviado")
+@grupo_cmd.command(name="nota_minima", description="Quantos pontos um post precisa para ser enviado")
 @app_commands.describe(pontos="Ex.: 3 = pelo menos uma skill principal; 6 = mais exigente")
 async def cmd_nota(interaction: discord.Interaction, pontos: app_commands.Range[int, 1, 30]):
     if not await _so_dono(interaction):
@@ -453,4 +577,4 @@ async def cmd_nota(interaction: discord.Interaction, pontos: app_commands.Range[
     await interaction.response.send_message(f"🎯 Nota mínima agora é {pontos} pts.", ephemeral=True)
 
 
-bot.tree.add_command(grupo)
+bot.tree.add_command(grupo_cmd)

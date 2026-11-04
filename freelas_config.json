@@ -1,36 +1,23 @@
 {
   "canal_id": 1567376882813370580,
   "mencao": "",
-  "intervalo_segundos": 300,
-  "nota_minima": 3,
-  "subreddits": [
+  "nota_minima": 5,
+  "idade_maxima_horas": 24,
+  "grupos": [
     {
-      "nome": "forhire",
-      "titulo": "\\[\\s*hiring\\s*\\]"
+      "nome": "Vagas e freelas (EN)",
+      "subs": ["forhire", "freelance_forhire", "hiring", "jobbit", "slavelabour", "RemoteJobs",
+               "remotepython", "PythonJobs", "DoneDirtCheap", "B2BForHire", "techjobs", "devopsjobs", "WorkOnline"]
     },
     {
-      "nome": "freelance_forhire",
-      "titulo": "\\[\\s*hiring\\s*\\]"
+      "nome": "Brasil, Portugal, LatAm e Europa",
+      "subs": ["brdev", "programacao", "devpt", "devsarg", "chileIT", "programacion",
+               "de_EDV", "informatik", "developpeurs"]
     },
     {
-      "nome": "hiring",
-      "titulo": "\\[\\s*hiring\\s*\\]"
-    },
-    {
-      "nome": "jobbit",
-      "titulo": "\\[\\s*hiring\\s*\\]"
-    },
-    {
-      "nome": "slavelabour",
-      "titulo": "\\[\\s*task\\s*\\]"
-    },
-    {
-      "nome": "RemoteJobs",
-      "titulo": "\\[\\s*hiring\\s*\\]|\\bfreelance\\b|\\bcontract(or)?\\b|\\bpart[- ]time\\b"
-    },
-    {
-      "nome": "brdev",
-      "titulo": "\\bfreela\\b|\\bcontrat(o|a|ando|ar)\\b|\\b(procuro|procura-se|preciso de|buscando)\\s+(um\\s+|uma\\s+)?(dev|desenvolvedor|desenvolvedora|programador|programadora)\\b|\\bor[cç]amento\\b|\\bprojeto pago\\b|\\[\\s*(vaga|freela)\\s*\\]"
+      "nome": "Negócios pedindo dev",
+      "subs": ["SaaS", "smallbusiness", "sideprojects", "startups", "Entrepreneur",
+               "n8n", "webscraping", "automation", "Discord_Bots"]
     }
   ]
 }
