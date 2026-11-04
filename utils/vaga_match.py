@@ -54,8 +54,11 @@ NAO_TENHO = {
     "graphql", "redis", "elasticsearch", "kafka", "salesforce", "sap", "delphi",
 }
 
+ESTAGIO = ("estágio", "estagio", "estagiário", "estagiario", "trainee")
+
 SENIORIDADE = {
-    "estágio": -2, "estagio": -2, "estagiário": -2, "trainee": -1,
+    # estágio/trainee aceitos (no vaga.py original eram descartados)
+    "estágio": 1, "estagio": 1, "estagiário": 1, "trainee": 1,
     "júnior": 3, "junior": 3, "jr": 2, "pleno": 2, "pl": 1,
     "sênior": -2, "senior": -2, "sr": -1, "especialista": -2,
     "tech lead": -3, "líder técnico": -3, "arquiteto": -3, "staff": -3,
@@ -91,6 +94,9 @@ def avaliar(titulo, descricao):
     # Senioridade: o título manda (descrição de vaga pleno costuma citar "sênior" em outro contexto)
     sen = _senioridade(normaliza(titulo)) or _senioridade(n)
     soma = sum(v for _, v in sen)
+    eh_estagio = any(contem(t, normaliza(titulo)) for t in ESTAGIO)
+    if eh_estagio:
+        soma = max(soma, 1)  # "estágio" no título vale mais que um "sênior" citado na descrição
     return {
         "curriculo": cv,
         "arquivo": CURRICULOS[cv]["arquivo"],
@@ -99,5 +105,6 @@ def avaliar(titulo, descricao):
         "lacunas": sorted({t for t in NAO_TENHO if contem(t, n)}),
         "senioridade": soma,
         "rotulos_nivel": [k for k, _ in sen],
-        "nivel": "júnior/pleno" if soma > 0 else ("fora da faixa" if soma < 0 else "não declarado"),
+        "nivel": "estágio/trainee" if eh_estagio else
+                 "júnior/pleno" if soma > 0 else ("fora da faixa" if soma < 0 else "não declarado"),
     }

@@ -34,7 +34,9 @@ RODAPE = "vaga:"  # marca os cards, para reconstruir vistos/funil a partir do ca
 # O título precisa ser de vaga de desenvolvimento
 TITULO_DEV = re.compile(
     r"desenvolv|developer|\bdev\b|engenheir[oa] de software|software engineer|programador|"
-    r"full[\s-]?stack|back[\s-]?end|front[\s-]?end|analista de (sistemas|desenvolvimento)|\.net|\bc#|node|react|python",
+    r"full[\s-]?stack|back[\s-]?end|front[\s-]?end|analista de (sistemas|desenvolvimento)|\.net|\bc#|node|react|python|"
+    r"est[aá]gi\w* (em |de )?(ti\b|tecnologia|software|sistemas|programa|desenvolv|computa)|"
+    r"trainee (de |em )?(ti\b|tecnologia|software|desenvolv)",
     re.I)
 # Stack principal que você não tem, quando está no título
 TITULO_FORA = re.compile(
@@ -428,7 +430,7 @@ async def cmd_status(interaction: discord.Interaction):
         e.add_field(name=nome, value=txt, inline=False)
     e.add_field(name="Filtros",
                 value=(f"aderência ≥ {CFG['min_aderencia']} • LinkedIn ≤ {CFG['max_candidatos']} candidatos • "
-                       f"sem sênior/estágio • Gupy: remoto ou {', '.join(CFG['cidades'])}"), inline=False)
+                       f"sem sênior • estágio incluso • Gupy: remoto ou {', '.join(CFG['cidades'])}"), inline=False)
     await interaction.response.send_message(embed=e, ephemeral=True)
 
 

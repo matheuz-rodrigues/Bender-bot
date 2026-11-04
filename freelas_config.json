@@ -120,6 +120,14 @@
       [
         "desenvolvedor full stack",
         "Belém, Pará, Brazil"
+      ],
+      [
+        "estágio desenvolvimento",
+        "Brazil"
+      ],
+      [
+        "estágio desenvolvedor",
+        "Belém, Pará, Brazil"
       ]
     ],
     "gupy": [
@@ -131,7 +139,9 @@
       "desenvolvedor c#",
       "desenvolvedor python",
       "desenvolvedor junior",
-      "desenvolvedor pleno"
+      "desenvolvedor pleno",
+      "estágio desenvolvimento",
+      "estágio ti"
     ]
   }
 }
