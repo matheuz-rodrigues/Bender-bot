@@ -1,4 +1,4 @@
-from utils import cotacoes, welcome, embeds, clear, logs, getTime, freelas
+from utils import cotacoes, welcome, embeds, clear, logs, getTime, freelas, divulgar
 from minigames import coinflip, ppt
 import requests
 import time

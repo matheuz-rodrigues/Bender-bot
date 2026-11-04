@@ -6,18 +6,72 @@
   "grupos": [
     {
       "nome": "Vagas e freelas (EN)",
-      "subs": ["forhire", "freelance_forhire", "hiring", "jobbit", "slavelabour", "RemoteJobs",
-               "remotepython", "PythonJobs", "DoneDirtCheap", "B2BForHire", "techjobs", "devopsjobs", "WorkOnline"]
+      "subs": [
+        "forhire",
+        "freelance_forhire",
+        "hiring",
+        "jobbit",
+        "slavelabour",
+        "RemoteJobs",
+        "remotepython",
+        "PythonJobs",
+        "DoneDirtCheap",
+        "B2BForHire",
+        "techjobs",
+        "devopsjobs",
+        "WorkOnline"
+      ]
     },
     {
       "nome": "Brasil, Portugal, LatAm e Europa",
-      "subs": ["brdev", "programacao", "devpt", "devsarg", "chileIT", "programacion",
-               "de_EDV", "informatik", "developpeurs"]
+      "subs": [
+        "brdev",
+        "programacao",
+        "devpt",
+        "devsarg",
+        "chileIT",
+        "programacion",
+        "de_EDV",
+        "informatik",
+        "developpeurs"
+      ]
     },
     {
       "nome": "Negócios pedindo dev",
-      "subs": ["SaaS", "smallbusiness", "sideprojects", "startups", "Entrepreneur",
-               "n8n", "webscraping", "automation", "Discord_Bots"]
+      "subs": [
+        "SaaS",
+        "smallbusiness",
+        "sideprojects",
+        "startups",
+        "Entrepreneur",
+        "n8n",
+        "webscraping",
+        "automation",
+        "Discord_Bots"
+      ]
     }
-  ]
+  ],
+  "divulgacao": {
+    "intervalo_dias": 7,
+    "taxa": "$15/hr",
+    "taxa_tarefa": "$20",
+    "taxa_br": "R$ 50/h",
+    "subs": [
+      {
+        "nome": "forhire",
+        "modelo": "completo",
+        "titulo": "[For Hire] Full-Stack Developer | Node.js/NestJS, React/Next.js, C#/.NET, Python scraping & automation | {taxa}"
+      },
+      {
+        "nome": "B2BForHire",
+        "modelo": "completo",
+        "titulo": "[For Hire] Full-Stack Developer – web apps, REST APIs, automation & AI integrations | {taxa}"
+      },
+      {
+        "nome": "slavelabour",
+        "modelo": "tarefa",
+        "titulo": "[OFFER] Python scraping, automations, bots and small web apps/APIs | from {taxa_tarefa} per task"
+      }
+    ]
+  }
 }
