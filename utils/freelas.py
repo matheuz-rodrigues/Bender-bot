@@ -388,7 +388,16 @@ async def cmd_aqui(interaction: discord.Interaction):
         return
     config["canal_id"] = interaction.channel_id
     _salvar_json(CONFIG_PATH, config)
-    await interaction.response.send_message("📡 Beleza! Os freelas vão chegar neste canal.", ephemeral=True)
+    estado["erro"] = None
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    n = await checar(forcar_envio=True)
+    resultado = f"⚠️ {estado['erro']}" if estado["erro"] else f"Primeira busca feita: {n} freela(s) enviado(s)."
+    await interaction.followup.send(
+        f"📡 Beleza! Os freelas vão chegar neste canal.\n{resultado}\n\n"
+        f"Para não perder essa configuração a cada deploy, coloque no `freelas_config.json`:\n"
+        f"`\"canal_id\": {interaction.channel_id}`",
+        ephemeral=True,
+    )
 
 
 @grupo.command(name="status", description="Mostra como está o radar")
