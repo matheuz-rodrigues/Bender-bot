@@ -1,3 +1,4 @@
+import asyncio
 import requests
 import discord
 from discord import app_commands
@@ -32,7 +33,7 @@ async def cotacao(ctx, quantidade: str = None, moeda: str = None):
           await ctx.send("Moeda Iválida, por favor tente novamente.", ephemeral=True)
         else:
             url = "https://economia.awesomeapi.com.br/json/last/" + tipo
-            response = requests.get(url)
+            response = await asyncio.to_thread(requests.get, url, timeout=10)
             dados = response.json()
             tipo = tipo.replace("-", "")
             convertido = float(dados[tipo]["bid"])
@@ -70,7 +71,7 @@ async def cotacao(interaction: discord.Interaction, quantidade: str = None, moed
           await interaction.response.send_message("Moeda Iválida, por favor tente novamente.", ephemeral=True)
         else:
             url = "https://economia.awesomeapi.com.br/json/last/" + tipo
-            response = requests.get(url)
+            response = await asyncio.to_thread(requests.get, url, timeout=10)
             dados = response.json()
             tipo = tipo.replace("-", "")
             convertido = float(dados[tipo]["bid"])

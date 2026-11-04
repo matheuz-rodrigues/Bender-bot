@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from bot_instance import bot
 from requests import get
@@ -7,7 +8,11 @@ from token_bot import url_api
 async def tempo(ctx):
     url = url_api + 'usertime'
 
-    response = get(f"{url}/{ctx.author.id}")
+    try:
+        response = await asyncio.to_thread(get, f"{url}/{ctx.author.id}", timeout=5)
+    except requests.exceptions.RequestException:
+        await ctx.send("Não consegui falar com a API de tempo agora. Tenta de novo daqui a pouco.")
+        return
     if response.status_code == 200:
         data = response.json()
         print(data)

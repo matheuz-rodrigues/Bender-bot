@@ -1,0 +1,36 @@
+{
+  "canal_id": 0,
+  "mencao": "",
+  "intervalo_segundos": 300,
+  "nota_minima": 3,
+  "subreddits": [
+    {
+      "nome": "forhire",
+      "titulo": "\\[\\s*hiring\\s*\\]"
+    },
+    {
+      "nome": "freelance_forhire",
+      "titulo": "\\[\\s*hiring\\s*\\]"
+    },
+    {
+      "nome": "hiring",
+      "titulo": "\\[\\s*hiring\\s*\\]"
+    },
+    {
+      "nome": "jobbit",
+      "titulo": "\\[\\s*hiring\\s*\\]"
+    },
+    {
+      "nome": "slavelabour",
+      "titulo": "\\[\\s*task\\s*\\]"
+    },
+    {
+      "nome": "RemoteJobs",
+      "titulo": "\\[\\s*hiring\\s*\\]|\\bfreelance\\b|\\bcontract(or)?\\b|\\bpart[- ]time\\b"
+    },
+    {
+      "nome": "brdev",
+      "titulo": "\\bfreela\\b|\\bcontrat(o|a|ando|ar)\\b|\\b(procuro|procura-se|preciso de|buscando)\\s+(um\\s+|uma\\s+)?(dev|desenvolvedor|desenvolvedora|programador|programadora)\\b|\\bor[cç]amento\\b|\\bprojeto pago\\b|\\[\\s*(vaga|freela)\\s*\\]"
+    }
+  ]
+}

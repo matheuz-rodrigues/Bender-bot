@@ -1,4 +1,5 @@
 import asyncio
+from discord.ext import tasks
 from bot_instance import bot
 from token_bot import TOKEN_BOT, url_api
 from imports import *
@@ -55,40 +56,30 @@ async def ajuda(ctx):
 
     await ctx.send(f"{ctx.author.mention}", embed=embed)
 
-a=0
 @bot.command()
 async def api(ctx):
-
-    global a
-    if a == 0:
-        await ctx.send("Ligando os motores...")
-
-        print("Iniciando API...")
-    else:
+    # Liga/desliga o ping. tasks.loop garante que nunca existam dois loops ao mesmo tempo.
+    if ping_api.is_running():
+        ping_api.cancel()
         await ctx.send("Desligando os motores...")
         print("Desligando API...")
-    a+=1
-    bot.loop.create_task(loop())
-
-async def loop():
-    global a
-    if a > 1:
-        a=0
     else:
-        while a == 1:
-            try:
-                url = url_api+"ping"
-                response = requests.get(url, timeout=5)
-                dados = response.json()
-                print(f"Funcionou, Status: {dados.get('status')}, Mensagem: {dados.get('msg')}")
+        ping_api.start()
+        await ctx.send("Ligando os motores...")
+        print("Iniciando API...")
 
-            except requests.exceptions.Timeout:
-                print("Erro: Timeout na requisição.")
 
-            except requests.exceptions.RequestException as e:
-                print(f"Erro na requisição: {e}")
-
-            await asyncio.sleep(600)
+@tasks.loop(minutes=10)
+async def ping_api():
+    try:
+        # requests é bloqueante: roda em outra thread para não congelar o bot
+        response = await asyncio.to_thread(requests.get, url_api + "ping", timeout=5)
+        dados = response.json()
+        print(f"Funcionou, Status: {dados.get('status')}, Mensagem: {dados.get('msg')}")
+    except requests.exceptions.Timeout:
+        print("Erro: Timeout na requisição.")
+    except (requests.exceptions.RequestException, ValueError) as e:
+        print(f"Erro na requisição: {e}")
 
 
 
