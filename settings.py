@@ -23,5 +23,9 @@ url_api = os.getenv("URL_API") or getattr(_local, "url_api", "") or "http://loca
 if not url_api.endswith("/"):
     url_api += "/"
 
+# Opcionais: IA do Bender (chave em platform.openai.com/api-keys). Sem chave, a IA fica desligada.
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or getattr(_local, "OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or getattr(_local, "OPENAI_MODEL", "")
+
 if not TOKEN_BOT:
     raise SystemExit("TOKEN_BOT não definido: configure a variável de ambiente ou o token_bot.py")
