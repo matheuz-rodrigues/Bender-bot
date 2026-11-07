@@ -35,7 +35,8 @@ CURRICULOS = {
     },
     "geral": {
         "arquivo": "Matheus Rodrigues - Desenvolvedor Full Stack.pdf",
-        "peso": {"full stack": 4, "fullstack": 4, "desenvolvedor": 1},
+        # "full-stack" e "developer": vagas internacionais escrevem assim
+        "peso": {"full stack": 4, "fullstack": 4, "full-stack": 4, "desenvolvedor": 1, "developer": 1},
     },
 }
 
