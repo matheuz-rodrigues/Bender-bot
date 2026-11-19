@@ -1,4 +1,6 @@
-"""Liga/desliga a máquina de desenvolvimento (EC2 proapp-dev): .ligar, .desligar, .maquina
+"""Liga/desliga a máquina de desenvolvimento (EC2 proapp-dev).
+
+Comandos: .ligar, .desligar, .maquina e /maquina ligar|desligar|status.
 
 Só o criador pode usar. A credencial AWS (usuário IAM bender-ec2) só consegue ligar,
 desligar e consultar essa instância. Chamadas à API da AWS assinadas na mão (SigV4),
@@ -12,7 +14,9 @@ import hmac
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+import discord
 import requests
+from discord import app_commands
 
 from bot_instance import bot
 from settings import AWS_EC2_KEY_ID, AWS_EC2_SECRET, AWS_EC2_REGION, AWS_EC2_INSTANCE
@@ -80,41 +84,31 @@ def _configurado():
     return all([AWS_EC2_KEY_ID, AWS_EC2_SECRET, AWS_EC2_INSTANCE])
 
 
-async def _pode_usar(ctx):
-    if ctx.author.id != CRIADOR_ID:
-        await ctx.send("Essa máquina é do meu criador, saco de carne. Tira a mão.")
-        return False
-    if not _configurado():
-        await ctx.send("Faltam as variáveis AWS_EC2_* no ambiente. Nem eu ligo máquina sem chave.")
-        return False
-    return True
+MSG_NAO_E_CRIADOR = "Essa máquina é do meu criador, saco de carne. Tira a mão."
+MSG_SEM_CONFIG = "Faltam as variáveis AWS_EC2_* no ambiente. Nem eu ligo máquina sem chave."
 
 
-@bot.command(name="maquina")
-async def maquina(ctx):
-    if not await _pode_usar(ctx):
-        return
+# --- lógica comum: `enviar(texto)` manda uma mensagem e devolve um objeto com .edit(content=...) ---
+
+async def _status(enviar):
     try:
         estado = await _em_thread(_estado)
-        await ctx.send(f"Máquina proapp-dev: **{ESTADOS.get(estado, estado)}**")
+        await enviar(f"Máquina proapp-dev: **{ESTADOS.get(estado, estado)}**")
     except Exception as e:
-        await ctx.send(f"A AWS me ignorou: `{e}`")
+        await enviar(f"A AWS me ignorou: `{e}`")
 
 
-@bot.command(name="ligar")
-async def ligar(ctx):
-    if not await _pode_usar(ctx):
-        return
+async def _ligar(enviar):
     try:
         estado = await _em_thread(_estado)
         if estado in ("running", "pending"):
-            await ctx.send(f"Já tá {ESTADOS[estado]}, gênio. Abre o app do Claude e vai trabalhar.")
+            await enviar(f"Já tá {ESTADOS[estado]}, gênio. Abre o app do Claude e vai trabalhar.")
             return
         if estado == "stopping":
-            await ctx.send("Ela ainda tá desligando. Espera um minuto e manda `.ligar` de novo.")
+            await enviar("Ela ainda tá desligando. Espera um minuto e manda ligar de novo.")
             return
         await _em_thread(_chamar_ec2, "StartInstances", **{"InstanceId.1": AWS_EC2_INSTANCE})
-        msg = await ctx.send("🟡 Ligando a proapp-dev...")
+        msg = await enviar("🟡 Ligando a proapp-dev...")
         for _ in range(36):  # até 3 min
             await asyncio.sleep(5)
             estado = await _em_thread(_estado)
@@ -126,19 +120,90 @@ async def ligar(ctx):
                 return
         await msg.edit(content=f"Demorou demais. Estado atual: {ESTADOS.get(estado, estado)}")
     except Exception as e:
-        await ctx.send(f"Não consegui ligar: `{e}`")
+        await enviar(f"Não consegui ligar: `{e}`")
+
+
+async def _desligar(enviar):
+    try:
+        estado = await _em_thread(_estado)
+        if estado in ("stopped", "stopping"):
+            await enviar(f"Já tá {ESTADOS[estado]}. Quer que eu desligue o quê, a tua cabeça?")
+            return
+        await _em_thread(_chamar_ec2, "StopInstances", **{"InstanceId.1": AWS_EC2_INSTANCE})
+        await enviar("🟠 Desligando a proapp-dev. Os arquivos ficam salvos no disco.")
+    except Exception as e:
+        await enviar(f"Não consegui desligar: `{e}`")
+
+
+# --- comandos de ponto: .ligar / .desligar / .maquina ---
+
+async def _pode_usar(ctx):
+    if ctx.author.id != CRIADOR_ID:
+        await ctx.send(MSG_NAO_E_CRIADOR)
+        return False
+    if not _configurado():
+        await ctx.send(MSG_SEM_CONFIG)
+        return False
+    return True
+
+
+@bot.command(name="maquina")
+async def maquina(ctx):
+    if await _pode_usar(ctx):
+        await _status(ctx.send)
+
+
+@bot.command(name="ligar")
+async def ligar(ctx):
+    if await _pode_usar(ctx):
+        await _ligar(ctx.send)
 
 
 @bot.command(name="desligar")
 async def desligar(ctx):
-    if not await _pode_usar(ctx):
-        return
-    try:
-        estado = await _em_thread(_estado)
-        if estado in ("stopped", "stopping"):
-            await ctx.send(f"Já tá {ESTADOS[estado]}. Quer que eu desligue o quê, a tua cabeça?")
-            return
-        await _em_thread(_chamar_ec2, "StopInstances", **{"InstanceId.1": AWS_EC2_INSTANCE})
-        await ctx.send("🟠 Desligando a proapp-dev. Os arquivos ficam salvos no disco.")
-    except Exception as e:
-        await ctx.send(f"Não consegui desligar: `{e}`")
+    if await _pode_usar(ctx):
+        await _desligar(ctx.send)
+
+
+# --- comandos de barra: /maquina ligar | desligar | status ---
+
+grupo = app_commands.Group(name="maquina", description="Liga/desliga a máquina de desenvolvimento proapp-dev")
+
+
+async def _slash_pode_usar(interaction):
+    """Recusa quem não é o criador (resposta só ele vê) e já 'segura' a interação (AWS pode passar de 3 s)."""
+    if interaction.user.id != CRIADOR_ID:
+        await interaction.response.send_message(MSG_NAO_E_CRIADOR, ephemeral=True)
+        return False
+    if not _configurado():
+        await interaction.response.send_message(MSG_SEM_CONFIG, ephemeral=True)
+        return False
+    await interaction.response.defer(thinking=True)
+    return True
+
+
+def _enviar_slash(interaction):
+    async def enviar(texto):
+        return await interaction.followup.send(texto, wait=True)
+    return enviar
+
+
+@grupo.command(name="ligar", description="Liga a máquina proapp-dev (só o criador)")
+async def slash_ligar(interaction: discord.Interaction):
+    if await _slash_pode_usar(interaction):
+        await _ligar(_enviar_slash(interaction))
+
+
+@grupo.command(name="desligar", description="Desliga a máquina proapp-dev (só o criador)")
+async def slash_desligar(interaction: discord.Interaction):
+    if await _slash_pode_usar(interaction):
+        await _desligar(_enviar_slash(interaction))
+
+
+@grupo.command(name="status", description="Mostra se a máquina proapp-dev está ligada (só o criador)")
+async def slash_status(interaction: discord.Interaction):
+    if await _slash_pode_usar(interaction):
+        await _status(_enviar_slash(interaction))
+
+
+bot.tree.add_command(grupo)
