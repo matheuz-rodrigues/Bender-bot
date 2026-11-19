@@ -1,4 +1,4 @@
-from utils import cotacoes, welcome, embeds, clear, logs, getTime, freelas, divulgar, vagas, bender_ia
+from utils import cotacoes, welcome, embeds, clear, logs, getTime, freelas, divulgar, vagas, bender_ia, ec2_controle
 from minigames import coinflip, ppt
 import requests
 import time
