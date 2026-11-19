@@ -80,12 +80,20 @@ async def _em_thread(funcao, *args, **kwargs):
     return await asyncio.to_thread(funcao, *args, **kwargs)
 
 
-def _configurado():
-    return all([AWS_EC2_KEY_ID, AWS_EC2_SECRET, AWS_EC2_INSTANCE])
+def _faltando():
+    """Nomes das variáveis obrigatórias que não chegaram ao bot (nunca mostra valores)."""
+    valores = {"AWS_EC2_KEY_ID": AWS_EC2_KEY_ID, "AWS_EC2_SECRET": AWS_EC2_SECRET, "AWS_EC2_INSTANCE": AWS_EC2_INSTANCE}
+    return [nome for nome, valor in valores.items() if not valor]
+
+
+def _msg_sem_config(faltando):
+    return (
+        f"Faltam estas variáveis no ambiente: {', '.join(f'`{n}`' for n in faltando)}. "
+        "Nem eu ligo máquina sem chave. (Na Discloud, variável nova só vale depois de um novo deploy.)"
+    )
 
 
 MSG_NAO_E_CRIADOR = "Essa máquina é do meu criador, saco de carne. Tira a mão."
-MSG_SEM_CONFIG = "Faltam as variáveis AWS_EC2_* no ambiente. Nem eu ligo máquina sem chave."
 
 
 # --- lógica comum: `enviar(texto)` manda uma mensagem e devolve um objeto com .edit(content=...) ---
@@ -141,8 +149,8 @@ async def _pode_usar(ctx):
     if ctx.author.id != CRIADOR_ID:
         await ctx.send(MSG_NAO_E_CRIADOR)
         return False
-    if not _configurado():
-        await ctx.send(MSG_SEM_CONFIG)
+    if faltando := _faltando():
+        await ctx.send(_msg_sem_config(faltando))
         return False
     return True
 
@@ -175,8 +183,8 @@ async def _slash_pode_usar(interaction):
     if interaction.user.id != CRIADOR_ID:
         await interaction.response.send_message(MSG_NAO_E_CRIADOR, ephemeral=True)
         return False
-    if not _configurado():
-        await interaction.response.send_message(MSG_SEM_CONFIG, ephemeral=True)
+    if faltando := _faltando():
+        await interaction.response.send_message(_msg_sem_config(faltando), ephemeral=True)
         return False
     await interaction.response.defer(thinking=True)
     return True

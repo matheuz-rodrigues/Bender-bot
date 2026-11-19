@@ -28,10 +28,15 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or getattr(_local, "OPENAI_API_KEY"
 OPENAI_MODEL = os.getenv("OPENAI_MODEL") or getattr(_local, "OPENAI_MODEL", "")
 
 # Opcionais: liga/desliga da EC2 proapp-dev (usuário IAM bender-ec2, só start/stop dessa instância).
-AWS_EC2_KEY_ID = os.getenv("AWS_EC2_KEY_ID") or getattr(_local, "AWS_EC2_KEY_ID", "")
-AWS_EC2_SECRET = os.getenv("AWS_EC2_SECRET") or getattr(_local, "AWS_EC2_SECRET", "")
-AWS_EC2_REGION = os.getenv("AWS_EC2_REGION") or getattr(_local, "AWS_EC2_REGION", "") or "sa-east-1"
-AWS_EC2_INSTANCE = os.getenv("AWS_EC2_INSTANCE") or getattr(_local, "AWS_EC2_INSTANCE", "")
+def _env_limpa(nome):
+    """Valor sem espaços e sem aspas em volta (erro comum ao colar no painel da Discloud)."""
+    return (os.getenv(nome) or getattr(_local, nome, "") or "").strip().strip("\"'").strip()
+
+
+AWS_EC2_KEY_ID = _env_limpa("AWS_EC2_KEY_ID")
+AWS_EC2_SECRET = _env_limpa("AWS_EC2_SECRET")
+AWS_EC2_REGION = _env_limpa("AWS_EC2_REGION") or "sa-east-1"
+AWS_EC2_INSTANCE = _env_limpa("AWS_EC2_INSTANCE")
 
 if not TOKEN_BOT:
     raise SystemExit("TOKEN_BOT não definido: configure a variável de ambiente ou o token_bot.py")
