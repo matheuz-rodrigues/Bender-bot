@@ -11,6 +11,7 @@ import asyncio
 import datetime
 import hashlib
 import hmac
+import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 
@@ -75,6 +76,71 @@ def _estado():
     return xml.find(".//{*}instanceState/{*}name").text
 
 
+# Preços on-demand em sa-east-1 (tabela de preços da AWS, nov/2026).
+PRECO_HORA_USD = {"m7i-flex.large": 0.15262}
+PRECO_DISCO_GB_MES_USD = 0.152  # gp3
+DISCO_GB = 40  # tamanho do EBS (o DescribeInstances não informa; ler exigiria ec2:DescribeVolumes)
+def _usd(valor, casas=2):
+    return f"US$ {valor:.{casas}f}".replace(".", ",")
+
+
+REGEX_DATA_GMT = re.compile(r"\((\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) GMT\)")
+
+
+def _detalhes():
+    """Estado, tipo, desde quando está ligada e por que/quando desligou (dados do DescribeInstances)."""
+    xml = _chamar_ec2("DescribeInstances", **{"InstanceId.1": AWS_EC2_INSTANCE})
+    inst = xml.find(".//{*}instancesSet/{*}item")
+    texto = lambda caminho: (inst.find(caminho).text if inst.find(caminho) is not None else "") or ""
+    return {
+        "estado": texto("{*}instanceState/{*}name"),
+        "tipo": texto("{*}instanceType"),
+        "ligada_em": texto("{*}launchTime"),
+        "transicao": texto("{*}reason"),
+        "motivo": texto("{*}stateReason/{*}code"),
+        "disco_gb": DISCO_GB,
+    }
+
+
+def _texto_status(d, agora=None):
+    """Monta a resposta do /status. Horários em formato do Discord (<t:...>), que aparecem no fuso de quem lê."""
+    agora = agora or datetime.datetime.now(datetime.timezone.utc)
+    linhas = [f"**proapp-dev**: {ESTADOS.get(d['estado'], d['estado'])}"]
+    preco = PRECO_HORA_USD.get(d["tipo"])
+
+    if d["estado"] in ("running", "pending") and d["ligada_em"]:
+        inicio = datetime.datetime.fromisoformat(d["ligada_em"].replace("Z", "+00:00"))
+        minutos = max(0, int((agora - inicio).total_seconds() // 60))
+        duracao = f"{minutos // 60}h {minutos % 60:02d}min" if minutos >= 60 else f"{minutos} min"
+        linhas.append(f"⏱️ Ligada há **{duracao}** (desde <t:{int(inicio.timestamp())}:t>)")
+        if preco:
+            linhas.append(f"💸 Esta sessão até agora: **≈ {_usd(minutos / 60 * preco)}**")
+        linhas.append("💤 Desliga sozinha após 30 min sem uso do Claude.")
+    elif d["estado"] == "stopped":
+        quando = REGEX_DATA_GMT.search(d["transicao"])
+        if d["motivo"] == "Client.InstanceInitiatedShutdown":
+            como = "desligou sozinha (ficou parada)"
+        elif d["motivo"] == "Client.UserInitiatedShutdown":
+            como = "foi desligada por comando"
+        else:
+            como = "desligada"
+        if quando:
+            fim = datetime.datetime.strptime(quando.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+            linhas.append(f"🛑 {como.capitalize()} <t:{int(fim.timestamp())}:R> (<t:{int(fim.timestamp())}:t>)")
+        else:
+            linhas.append(f"🛑 {como.capitalize()}.")
+        linhas.append("Use `/ligar` para subir de novo (~1 min).")
+
+    custo = []
+    if preco:
+        custo.append(f"{_usd(preco, 3)}/h ligada")
+    if d["disco_gb"]:
+        custo.append(f"disco {d['disco_gb']} GB ≈ {_usd(d['disco_gb'] * PRECO_DISCO_GB_MES_USD)}/mês")
+    if custo:
+        linhas.append(f"-# {d['tipo']} · {' · '.join(custo)}")
+    return "\n".join(linhas)
+
+
 async def _em_thread(funcao, *args, **kwargs):
     return await asyncio.to_thread(funcao, *args, **kwargs)
 
@@ -99,8 +165,7 @@ MSG_NAO_E_CRIADOR = "Essa máquina é do meu criador, saco de carne. Tira a mão
 
 async def _status(enviar):
     try:
-        estado = await _em_thread(_estado)
-        await enviar(f"Máquina proapp-dev: **{ESTADOS.get(estado, estado)}**")
+        await enviar(_texto_status(await _em_thread(_detalhes)))
     except Exception as e:
         await enviar(f"A AWS me ignorou: `{e}`")
 
