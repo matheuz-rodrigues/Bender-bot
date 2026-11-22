@@ -1,6 +1,6 @@
 """Liga/desliga a máquina de desenvolvimento (EC2 proapp-dev).
 
-Comandos: .ligar, .desligar, .maquina e /maquina ligar|desligar|status.
+Comandos: .ligar, .desligar, .status (apelido .maquina) e /ligar, /desligar, /status.
 
 Só o criador pode usar. A credencial AWS (usuário IAM bender-ec2) só consegue ligar,
 desligar e consultar essa instância. Chamadas à API da AWS assinadas na mão (SigV4),
@@ -16,7 +16,6 @@ import xml.etree.ElementTree as ET
 
 import discord
 import requests
-from discord import app_commands
 
 from bot_instance import bot
 from settings import AWS_EC2_KEY_ID, AWS_EC2_SECRET, AWS_EC2_REGION, AWS_EC2_INSTANCE
@@ -143,7 +142,7 @@ async def _desligar(enviar):
         await enviar(f"Não consegui desligar: `{e}`")
 
 
-# --- comandos de ponto: .ligar / .desligar / .maquina ---
+# --- comandos de ponto: .ligar / .desligar / .status (.maquina continua como apelido) ---
 
 async def _pode_usar(ctx):
     if ctx.author.id != CRIADOR_ID:
@@ -155,8 +154,8 @@ async def _pode_usar(ctx):
     return True
 
 
-@bot.command(name="maquina")
-async def maquina(ctx):
+@bot.command(name="status", aliases=["maquina"])
+async def status(ctx):
     if await _pode_usar(ctx):
         await _status(ctx.send)
 
@@ -173,10 +172,7 @@ async def desligar(ctx):
         await _desligar(ctx.send)
 
 
-# --- comandos de barra: /maquina ligar | desligar | status ---
-
-grupo = app_commands.Group(name="maquina", description="Liga/desliga a máquina de desenvolvimento proapp-dev")
-
+# --- comandos de barra: /ligar | /desligar | /status ---
 
 async def _slash_pode_usar(interaction):
     """Recusa quem não é o criador (resposta só ele vê) e já 'segura' a interação (AWS pode passar de 3 s)."""
@@ -196,22 +192,19 @@ def _enviar_slash(interaction):
     return enviar
 
 
-@grupo.command(name="ligar", description="Liga a máquina proapp-dev (só o criador)")
+@bot.tree.command(name="ligar", description="Liga a máquina proapp-dev (só o criador)")
 async def slash_ligar(interaction: discord.Interaction):
     if await _slash_pode_usar(interaction):
         await _ligar(_enviar_slash(interaction))
 
 
-@grupo.command(name="desligar", description="Desliga a máquina proapp-dev (só o criador)")
+@bot.tree.command(name="desligar", description="Desliga a máquina proapp-dev (só o criador)")
 async def slash_desligar(interaction: discord.Interaction):
     if await _slash_pode_usar(interaction):
         await _desligar(_enviar_slash(interaction))
 
 
-@grupo.command(name="status", description="Mostra se a máquina proapp-dev está ligada (só o criador)")
+@bot.tree.command(name="status", description="Mostra se a máquina proapp-dev está ligada (só o criador)")
 async def slash_status(interaction: discord.Interaction):
     if await _slash_pode_usar(interaction):
         await _status(_enviar_slash(interaction))
-
-
-bot.tree.add_command(grupo)
